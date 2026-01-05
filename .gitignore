@@ -1,0 +1,29 @@
+# Dependências
+node_modules/
+dist/
+
+# Arquivos de ambiente (NUNCA SUBIR PARA O GIT!)
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Testes
+coverage/
+
+# Build
+build/
