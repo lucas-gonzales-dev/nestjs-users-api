@@ -1,136 +1,78 @@
 # NestJS Users API
 
-Sistema de gerenciamento de usuários com autenticação JWT desenvolvido para o desafio de API REST da DNC.
+![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white) ![TypeORM](https://img.shields.io/badge/TypeORM-0.3-FE0803) ![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white) ![JWT](https://img.shields.io/badge/auth-JWT-000000?logo=jsonwebtokens&logoColor=white)
 
-## Sobre
+API REST de usuários com cadastro, login e rotas protegidas por JWT. Pequena de propósito: o foco foi fazer a parte de autenticação e validação do jeito certo, não ter muitas rotas.
 
-API RESTful para gerenciamento de usuários. Permite criar, listar, atualizar e remover usuários com autenticação JWT para proteção das rotas. Desenvolvida com NestJS, TypeORM e MySQL.
+Desafio da formação **Engenheiro de Software (Escola DNC)**, entregue e aprovado na avaliação do projeto.
 
-## Tecnologias
+## Como a autenticação funciona
 
-- NestJS
-- TypeORM
-- MySQL
-- Passport.js / JWT
-- bcrypt
+```mermaid
+sequenceDiagram
+    participant C as Cliente
+    participant A as AuthController
+    participant S as AuthService
+    participant U as UsersService
+    participant DB as MySQL
 
-## Modelagem do Banco de Dados
+    C->>A: POST /auth/login {username, password}
+    A->>S: login()
+    S->>U: findByUsername()
+    U->>DB: SELECT
+    DB-->>U: usuário (com hash)
+    S->>U: bcrypt.compare(senha, hash)
+    S-->>C: access_token (JWT, expira em 1h)
 
+    C->>A: GET /users  Authorization: Bearer <token>
+    Note over A: JwtAuthGuard valida assinatura e expiração<br/>antes de chegar no controller
+    A-->>C: 200 lista de usuários (sem senha)
 ```
-┌──────────────────────┐
-│        USERS         │
-├──────────────────────┤
-│ id (PK)              │
-│ name                 │
-│ username (unique)    │
-│ email (unique)       │
-│ password (hash)      │
-│ createdAt            │
-│ updatedAt            │
-└──────────────────────┘
-```
 
-## Como usar
+## O que tem de cuidado aqui
 
-Clone o repositório e instale as dependências:
+- **Senha nunca sai da API.** O hash (bcrypt, 10 rounds) fica no banco, e todo retorno do service remove o campo `password` antes de responder. O tipo de retorno (`Omit<User, 'password'>`) garante isso em tempo de compilação.
+- **Validação na entrada, não no meio do código.** DTOs com `class-validator` e um `ValidationPipe` global com `whitelist` e `forbidNonWhitelisted`: campo que não está no DTO é recusado com 400, em vez de ser ignorado em silêncio.
+- **Erros previsíveis.** Username ou e-mail duplicado retorna 409 (`ConflictException`), ID inexistente retorna 404. Um filtro global padroniza o corpo de erro, então o front sempre recebe o mesmo formato.
+- **Login sem dar pista.** Usuário inexistente e senha errada retornam a mesma mensagem ("Credenciais inválidas"), para não revelar quais usernames existem.
+
+## O que aprendi
+
+- A arquitetura do Nest: módulos, injeção de dependência, controllers finos e services com a regra
+- Passport + JWT na prática: strategy, guard e o que vai (e o que não vai) no payload do token
+- Por que validar com DTO + pipe global em vez de `if` espalhado pelos controllers
+- Mapear entidade com TypeORM e deixar unicidade (username, e-mail) também no banco, não só no código
+
+## Endpoints
+
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| POST | `/auth/login` | Login, devolve o JWT | – |
+| POST | `/users` | Cadastro de usuário | – |
+| GET | `/users` | Lista usuários | JWT |
+| GET | `/users/:id` | Busca por ID | JWT |
+| PUT | `/users/:id` | Atualiza (re-hash se a senha mudar) | JWT |
+| DELETE | `/users/:id` | Remove | JWT |
+
+## Rodando
 
 ```bash
 git clone https://github.com/lucas-gonzales-dev/nestjs-users-api.git
 cd nestjs-users-api
 npm install
-```
-
-Crie o banco de dados MySQL:
-
-```sql
-CREATE DATABASE nestjs_api;
-```
-
-Configure o arquivo `.env`:
-
-```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_USERNAME=root
-DB_PASSWORD=sua_senha
-DB_DATABASE=nestjs_api
-JWT_SECRET=sua_chave_secreta
-PORT=3000
-```
-
-Inicie o servidor:
-
-```bash
+cp .env.example .env     # preencha os dados do MySQL e o JWT_SECRET
 npm run start:dev
 ```
 
-Acesse http://localhost:3000 para verificar se a API está rodando.
+Crie o banco antes (`CREATE DATABASE nestjs_api;`). Em desenvolvimento, o TypeORM cria as tabelas sozinho (`synchronize: true`).
 
-## Estrutura
+## Próximos passos
 
-```
-├── src/
-│   ├── auth/
-│   │   ├── dto/
-│   │   │   └── login.dto.ts
-│   │   ├── guards/
-│   │   │   └── jwt-auth.guard.ts
-│   │   ├── strategies/
-│   │   │   └── jwt.strategy.ts
-│   │   ├── auth.controller.ts
-│   │   ├── auth.module.ts
-│   │   └── auth.service.ts
-│   ├── users/
-│   │   ├── dto/
-│   │   │   ├── create-user.dto.ts
-│   │   │   └── update-user.dto.ts
-│   │   ├── entities/
-│   │   │   └── user.entity.ts
-│   │   ├── users.controller.ts
-│   │   ├── users.module.ts
-│   │   └── users.service.ts
-│   ├── app.module.ts
-│   └── main.ts
-├── .env.example
-├── package.json
-└── README.md
-```
+- Trocar `synchronize` por migrations versionadas
+- Docker Compose com MySQL para subir tudo com um comando
+- Testes e2e do fluxo de login e das rotas protegidas
+- Refresh token
 
-## API Endpoints
+---
 
-### Autenticação
-
-| Método | Rota          | Descrição        | Auth |
-| ------ | ------------- | ---------------- | ---- |
-| POST   | /auth/login   | Login do usuário | Não  |
-
-### Usuários
-
-| Método | Rota       | Descrição              | Auth |
-| ------ | ---------- | ---------------------- | ---- |
-| POST   | /users     | Cadastra novo usuário  | Não  |
-| GET    | /users     | Lista todos os usuários| JWT  |
-| GET    | /users/:id | Busca usuário por ID   | JWT  |
-| PUT    | /users/:id | Atualiza usuário       | JWT  |
-| DELETE | /users/:id | Remove usuário         | JWT  |
-
-## Autenticação JWT
-
-Para acessar rotas protegidas, inclua o token no header:
-
-```
-Authorization: Bearer <seu_token_jwt>
-```
-
-## Funcionalidades
-
-- Cadastro de usuários com validação de dados
-- Criptografia de senhas com bcrypt
-- Autenticação via JWT com tempo de expiração
-- CRUD completo de usuários
-- Proteção de rotas com guards
-- Validação de username e email únicos
-
-## Autor
-
-Lucas Gonzales
+Feito por **Lucas Leite Gonzales** · [LinkedIn](https://www.linkedin.com/in/lucas-leite-gonzales-dev/)
