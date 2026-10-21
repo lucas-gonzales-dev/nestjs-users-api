@@ -35,8 +35,8 @@ API RESTful para gerenciamento de usuários. Permite criar, listar, atualizar e 
 Clone o repositório e instale as dependências:
 
 ```bash
-git clone <url-do-repositorio>
-cd RID99751_Desafio_Desenvolva_uma_API_REST_com_NestJs
+git clone https://github.com/lucas-gonzales-dev/nestjs-users-api.git
+cd nestjs-users-api
 npm install
 ```
 
